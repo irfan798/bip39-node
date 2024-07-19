@@ -1,9 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const sha256_1 = require("@noble/hashes/sha256");
-const sha512_1 = require("@noble/hashes/sha512");
-const pbkdf2_1 = require("@noble/hashes/pbkdf2");
-const utils_1 = require("@noble/hashes/utils");
+const crypto = require("crypto");
 const _wordlists_1 = require("./_wordlists");
 let DEFAULT_WORDLIST = _wordlists_1._default;
 const INVALID_MNEMONIC = 'Invalid mnemonic';
@@ -29,29 +26,34 @@ function bytesToBinary(bytes) {
 function deriveChecksumBits(entropyBuffer) {
     const ENT = entropyBuffer.length * 8;
     const CS = ENT / 32;
-    const hash = sha256_1.sha256(Uint8Array.from(entropyBuffer));
+    const hash = crypto
+        .createHash('sha256')
+        .update(entropyBuffer)
+        .digest();
     return bytesToBinary(Array.from(hash)).slice(0, CS);
 }
 function salt(password) {
     return 'mnemonic' + (password || '');
 }
 function mnemonicToSeedSync(mnemonic, password) {
-    const mnemonicBuffer = Uint8Array.from(Buffer.from(normalize(mnemonic), 'utf8'));
-    const saltBuffer = Uint8Array.from(Buffer.from(salt(normalize(password)), 'utf8'));
-    const res = pbkdf2_1.pbkdf2(sha512_1.sha512, mnemonicBuffer, saltBuffer, {
-        c: 2048,
-        dkLen: 64,
-    });
-    return Buffer.from(res);
+    const mnemonicBuffer = Buffer.from(normalize(mnemonic), 'utf8');
+    const saltBuffer = Buffer.from(salt(normalize(password)), 'utf8');
+    return crypto.pbkdf2Sync(mnemonicBuffer, saltBuffer, 2048, 64, 'sha512');
 }
 exports.mnemonicToSeedSync = mnemonicToSeedSync;
 function mnemonicToSeed(mnemonic, password) {
-    const mnemonicBuffer = Uint8Array.from(Buffer.from(normalize(mnemonic), 'utf8'));
-    const saltBuffer = Uint8Array.from(Buffer.from(salt(normalize(password)), 'utf8'));
-    return pbkdf2_1.pbkdf2Async(sha512_1.sha512, mnemonicBuffer, saltBuffer, {
-        c: 2048,
-        dkLen: 64,
-    }).then((res) => Buffer.from(res));
+    const mnemonicBuffer = Buffer.from(normalize(mnemonic), 'utf8');
+    const saltBuffer = Buffer.from(salt(normalize(password)), 'utf8');
+    return new Promise((resolve, reject) => {
+        crypto.pbkdf2(mnemonicBuffer, saltBuffer, 2048, 64, 'sha512', (err, derivedKey) => {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve(derivedKey);
+            }
+        });
+    });
 }
 exports.mnemonicToSeed = mnemonicToSeed;
 function mnemonicToEntropy(mnemonic, wordlist) {
@@ -132,7 +134,7 @@ function generateMnemonic(strength, rng, wordlist) {
     if (strength % 32 !== 0) {
         throw new TypeError(INVALID_ENTROPY);
     }
-    rng = rng || ((size) => Buffer.from(utils_1.randomBytes(size)));
+    rng = rng || ((size) => crypto.randomBytes(size));
     return entropyToMnemonic(rng(strength / 8), wordlist);
 }
 exports.generateMnemonic = generateMnemonic;
