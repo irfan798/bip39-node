@@ -17,12 +17,12 @@ test('README example 1', function (t) {
 
 test('README example 2', function (t) {
   const stub = {
-    '@noble/hashes/utils': {
+    'crypto': {
       randomBytes: function (size) {
         return Uint8Array.from(Buffer.from('qwertyuiopasdfghjklzxcvbnm[];,./'.slice(0, size), 'utf8'))
       }
     }
-  }
+  }  
   const proxiedbip39 = proxyquire('../', stub)
 
   // mnemonic strength defaults to 128 bits
